@@ -1,13 +1,13 @@
-print("API FILE LOADED")
 from fastapi import FastAPI
 from pydantic import BaseModel
 import joblib
 import pandas as pd
 
+print("API FILE LOADED")
+
 app = FastAPI()
 
-# Load trained model
-model = joblib.load("models/model.pkl")
+pipeline = joblib.load("models/churn_pipeline.pkl")
 
 
 class CustomerData(BaseModel):
@@ -40,37 +40,15 @@ def home():
 @app.post("/predict")
 def predict(customer: CustomerData):
     input_dict = customer.dict()
-
     df = pd.DataFrame([input_dict])
 
-    # Same preprocessing as training
-    df = pd.get_dummies(df, drop_first=True)
+    probability = pipeline.predict_proba(df)[0][1]
 
-    # Match training columns
-    training_columns = [
-        'SeniorCitizen', 'tenure', 'MonthlyCharges', 'TotalCharges',
-        'gender_Male', 'Partner_Yes', 'Dependents_Yes', 'PhoneService_Yes',
-        'MultipleLines_No phone service', 'MultipleLines_Yes',
-        'InternetService_Fiber optic', 'InternetService_No',
-        'OnlineSecurity_No internet service', 'OnlineSecurity_Yes',
-        'OnlineBackup_No internet service', 'OnlineBackup_Yes',
-        'DeviceProtection_No internet service', 'DeviceProtection_Yes',
-        'TechSupport_No internet service', 'TechSupport_Yes',
-        'StreamingTV_No internet service', 'StreamingTV_Yes',
-        'StreamingMovies_No internet service', 'StreamingMovies_Yes',
-        'Contract_One year', 'Contract_Two year',
-        'PaperlessBilling_Yes',
-        'PaymentMethod_Credit card (automatic)',
-        'PaymentMethod_Electronic check',
-        'PaymentMethod_Mailed check'
-    ]
-
-    df = df.reindex(columns=training_columns, fill_value=0)
-
-    prediction = model.predict(df)[0]
-    probability = model.predict_proba(df)[0][1]
+    threshold = 0.3
+    prediction = 1 if probability > threshold else 0
 
     return {
         "prediction": int(prediction),
-        "churn_probability": float(probability)
+        "churn_probability": float(probability),
+        "threshold_used": threshold
     }
