@@ -1,14 +1,15 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-import joblib
 import pandas as pd
+import mlflow
+import mlflow.sklearn
 
 print("API FILE LOADED")
 
 app = FastAPI()
 
-pipeline = joblib.load("models/churn_pipeline.pkl")
-
+mlflow.set_tracking_uri("sqlite:///mlflow.db")
+model = mlflow.sklearn.load_model("models:/ChurnPredictionPipeline@champion")
 
 class CustomerData(BaseModel):
     gender: str
@@ -42,7 +43,7 @@ def predict(customer: CustomerData):
     input_dict = customer.dict()
     df = pd.DataFrame([input_dict])
 
-    probability = pipeline.predict_proba(df)[0][1]
+    probability = model.predict_proba(df)[0][1]
 
     threshold = 0.3
     prediction = 1 if probability > threshold else 0
